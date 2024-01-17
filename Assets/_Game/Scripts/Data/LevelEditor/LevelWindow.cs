@@ -54,6 +54,8 @@ namespace GameEngine.Core
 			SceneView.duringSceneGui -= this.OnSceneGUI;
 		}
 
+		int indexovic = 0;
+
 		private void OnGUI()
 		{
 			GUILayout.Space(20f);
@@ -116,6 +118,7 @@ namespace GameEngine.Core
 
 					GUILayout.BeginHorizontal();
 					GUILayout.BeginVertical();
+
 					var grid = new GridEditor(50, 50);
 					for (int blockAssetIndex = 0; blockAssetIndex < _assetPack.BlockAssets.Count; blockAssetIndex++)
 					{
@@ -306,7 +309,7 @@ namespace GameEngine.Core
 
 		private void SaveLevel()
 		{
-			// Create new level data.
+			// Create new level data if there is not any level selected.
 			if (_loadedLevelData == null)
 			{
 				string fileName = $"{System.Guid.NewGuid().ToString()}";
