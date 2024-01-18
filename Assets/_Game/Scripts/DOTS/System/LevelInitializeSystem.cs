@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -16,6 +17,7 @@ namespace GameEngine.Core
 		private static LevelAssetPackConfigHash _levelAssetPackConfigHash;
 		private static NativeArray<CubeColor> _availableCubeColors;
 
+		[BurstCompile]
 		public void OnCreate(ref SystemState state)
 		{
 			state.RequireForUpdate<LevelConfig>();
@@ -23,6 +25,7 @@ namespace GameEngine.Core
 			state.RequireForUpdate<LevelAssetPackConfig>();
 		}
 
+		[BurstCompile]
 		public void OnUpdate(ref SystemState state)
 		{
 			state.Enabled = false;
@@ -54,6 +57,7 @@ namespace GameEngine.Core
 				}
 			}
 
+			// Cache available cube colors for random cubes.
 			_availableCubeColors = new NativeArray<CubeColor>(availableColors.Length, Allocator.Persistent);
 			for (int index = 0; index < availableColors.Length; index++)
 				_availableCubeColors[index] = availableColors[index].CubeColor;
@@ -61,15 +65,16 @@ namespace GameEngine.Core
 			var random = new Random((uint)DateTime.Now.Millisecond);
 			var ecb = new EntityCommandBuffer(Allocator.Temp);
 
+			// Create cube entities with level data.
 			for (int column = 0; column < levelConfig.GridSize.x; column++)
 			{
 				for (int row = 0; row < levelConfig.GridSize.y; row++)
 				{
-					var tileData = levelTiles[column * levelConfig.GridSize.x + row];
+					var tileData = levelTiles[column * levelConfig.GridSize.y + row];
+
+					// Replace random cubes with cubes from available colors.
 					if (tileData.BlockType == BlockType.Cube && tileData.CubeColor == CubeColor.Random)
-					{
 						tileData.CubeColor = _availableCubeColors[random.NextInt(0, _availableCubeColors.Length)];
-					}
 
 					var entityTileData = new LevelTile
 					{
@@ -91,7 +96,7 @@ namespace GameEngine.Core
 					ecb.AddComponent<LevelTile>(tileEntity, entityTileData);
 					ecb.SetComponent<LocalTransform>(tileEntity, entityLocalTransform);
 
-					UnityEngine.Debug.Log($"System Cube : {tileData.GridIndex}");
+					// UnityEngine.Debug.Log($"System Cube : {tileData.GridIndex}");
 				}
 			}
 
