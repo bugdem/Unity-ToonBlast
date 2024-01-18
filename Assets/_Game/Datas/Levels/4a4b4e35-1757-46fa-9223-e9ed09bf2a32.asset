@@ -10,9 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73057c5c6b86c6d42862ebd579f45620, type: 3}
-  m_Name: dfd62728-022e-4d1e-9d1f-e954119c092c
+  m_Name: 4a4b4e35-1757-46fa-9223-e9ed09bf2a32
   m_EditorClassIdentifier: 
   AssetPack: {fileID: 0}
   Row: 10
   Col: 10
   Tiles: []
+  AvailableColors: 

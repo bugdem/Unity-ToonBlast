@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: Pink
   m_EditorClassIdentifier: 
   _title: Pink
+  _assets:
+  - Prefab: {fileID: 8364158889781376066, guid: aef3c27afb03e414f887ce74ea4a44cd,
+      type: 3}
+    Icon: {fileID: 21300000, guid: c398d31ddac6d01458abf60064c2b99d, type: 3}
+  - Prefab: {fileID: 6626896614838974208, guid: b6a273f32b44f4d4c8ecd2614cf5edf7,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 527dd35454ad0844b9cecfa21062b5e3, type: 3}
+  - Prefab: {fileID: 4537577096827331668, guid: c807c8b8e0ebea34eb906116b4a9030f,
+      type: 3}
+    Icon: {fileID: 21300000, guid: f8eca07c6c938ca4db7b68226ede8ecd, type: 3}
+  - Prefab: {fileID: 9160135984693683073, guid: 975458350e9f76a4bbecd6e904a5513b,
+      type: 3}
+    Icon: {fileID: 21300000, guid: a80aa21f1b88dab42aec64da327b121f, type: 3}
   _color: 3
-  _defaultIcon: {fileID: 21300000, guid: c398d31ddac6d01458abf60064c2b99d, type: 3}
-  _conditionalIcons: []

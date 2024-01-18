@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: BoxObstacle
   m_EditorClassIdentifier: 
   _title: Box
-  _defaultIcon: {fileID: 21300000, guid: 1137d48d13e56f14e8ab9c21a0e60259, type: 3}
-  _layeredIcons:
-  - {fileID: 21300000, guid: 8d0e285075661ce4a839945eed7447af, type: 3}
+  _assets:
+  - Prefab: {fileID: 1849574599145100592, guid: 8727bed6628eca643bbafe6a476481a7,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 8d0e285075661ce4a839945eed7447af, type: 3}
+  - Prefab: {fileID: 7320027550554725332, guid: f3144808243ea954280f3e0315183709,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 1137d48d13e56f14e8ab9c21a0e60259, type: 3}

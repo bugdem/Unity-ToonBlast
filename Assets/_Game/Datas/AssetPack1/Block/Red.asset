@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: Red
   m_EditorClassIdentifier: 
   _title: Red
+  _assets:
+  - Prefab: {fileID: 8364158889781376066, guid: fc6b6a0f5832ba643bcc5cbf7770adeb,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 7a2577caafe405248ae397161c459ffa, type: 3}
+  - Prefab: {fileID: 6626896614838974208, guid: 7a6f74480cdfbd64ab63dcc7ac56a5bf,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 6db66b45dc6e11842aea4908e9c8f458, type: 3}
+  - Prefab: {fileID: 4537577096827331668, guid: d42b4c3a50e549f4eae74bc87aa436d2,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 2bc5d090d652c8c44ba52dafa783ed14, type: 3}
+  - Prefab: {fileID: 9160135984693683073, guid: d28aba2d0037d094bbc2b80d2a264cdd,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 4bba3424ca7974741a1b5977cb3fadc7, type: 3}
   _color: 5
-  _defaultIcon: {fileID: 21300000, guid: 7a2577caafe405248ae397161c459ffa, type: 3}
-  _conditionalIcons: []

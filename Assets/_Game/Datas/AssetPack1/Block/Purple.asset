@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: Purple
   m_EditorClassIdentifier: 
   _title: Purple
+  _assets:
+  - Prefab: {fileID: 8364158889781376066, guid: c16fc6cf1b574a24897313aa79d5a2f2,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 2a7861fdc47806045a1d4e5af556dbae, type: 3}
+  - Prefab: {fileID: 6626896614838974208, guid: f83aded61fbfa1e46964ff2c3c6b38bd,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 3065778ba9af3b34ab8b1fa4b054c30f, type: 3}
+  - Prefab: {fileID: 4537577096827331668, guid: ac489b41e84c70d41a3d33b4fe45c8ef,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 54c45459ad85d7040bfcd87bd138a1fa, type: 3}
+  - Prefab: {fileID: 9160135984693683073, guid: d7b393baec2832449a63b892bf8604e5,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 97fdc77f92f894b47aef52a41e2247ac, type: 3}
   _color: 4
-  _defaultIcon: {fileID: 21300000, guid: 2a7861fdc47806045a1d4e5af556dbae, type: 3}
-  _conditionalIcons: []

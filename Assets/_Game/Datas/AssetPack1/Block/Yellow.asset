@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: Yellow
   m_EditorClassIdentifier: 
   _title: Yellow
+  _assets:
+  - Prefab: {fileID: 8364158889781376066, guid: 51165ed49cb40a344973d58daf9a0722,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 2a895de3afcd3ed4f84a00e520c9544e, type: 3}
+  - Prefab: {fileID: 6626896614838974208, guid: faa1d84dbd295d447b838272568e7855,
+      type: 3}
+    Icon: {fileID: 21300000, guid: ce526e6ef8b796740b938ae54d8b9473, type: 3}
+  - Prefab: {fileID: 4537577096827331668, guid: 7e31e53503fd5844bb78743c73dd421f,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 30528d847a653304cb8b30885f906d1f, type: 3}
+  - Prefab: {fileID: 9160135984693683073, guid: be622d0c1d588d740bd56b6e8395b22d,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 70fde697658f52b4dba97f84e5bef1f8, type: 3}
   _color: 6
-  _defaultIcon: {fileID: 21300000, guid: 2a895de3afcd3ed4f84a00e520c9544e, type: 3}
-  _conditionalIcons: []

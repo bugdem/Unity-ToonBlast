@@ -8,9 +8,10 @@ namespace GameEngine.Core
 	[Serializable]
 	public class TileData
 	{
+		public string AssetTitle;
 		public BlockType BlockType;
 		public CubeColor CubeColor;
-		public int Iteration;
+		public int AssetIndex;
 	}
 
 	[Serializable]
@@ -26,5 +27,6 @@ namespace GameEngine.Core
 		public int Row = 10;
 		public int Col = 10;
 		public List<TileColumn> Tiles;
+		public List<CubeColor> AvailableColors;
     }
 }

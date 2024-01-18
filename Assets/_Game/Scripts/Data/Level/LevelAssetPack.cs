@@ -8,8 +8,7 @@ namespace GameEngine.Core
     [CreateAssetMenu(fileName = "AssetPack", menuName = "Game Engine/Asset Pack")]
     public class LevelAssetPack : ScriptableObject
     {
+        public int Id;
         public List<BlockData> BlockAssets;
-
-
     }
 }

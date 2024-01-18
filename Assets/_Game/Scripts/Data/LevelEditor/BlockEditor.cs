@@ -7,7 +7,7 @@ namespace GameEngine.Core
     public class BlockEditor : MonoBehaviour
     {
         public SpriteRenderer IconRenderer;
-        [HideInInspector] public TileData Data;
-        [HideInInspector] public Vector2Int GridIndex;
+        public TileData Data;
+        public Vector2Int GridIndex;
     }
 }

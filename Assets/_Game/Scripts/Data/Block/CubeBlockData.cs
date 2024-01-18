@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Entities;
+using Unity.Entities.Serialization;
 using UnityEngine;
 
 namespace GameEngine.Core
@@ -19,22 +20,16 @@ namespace GameEngine.Core
 		Yellow
 	}
 
+	[Serializable]
+	public class CubeBlockAsset : BlockAsset { }
+
 	[CreateAssetMenu(fileName = "Cube", menuName = "Game Engine/Blocks/Cube")]
-    public class CubeBlockData : BlockData
+    public class CubeBlockData : BlockDataGen<CubeBlockAsset>
     {
+		[Header("Cube Block")]
 		[SerializeField] private CubeColor _color;
-		[SerializeField] private Sprite _defaultIcon;
-		[SerializeField] private List<Sprite> _conditionalIcons;
 
 		public override BlockType Type => BlockType.Cube;
 		public CubeColor Color => _color;
-		public int ConditionCount => _conditionalIcons.Count;
-
-		public Sprite GetDefaultIcon() => _defaultIcon;
-		public Sprite GetConditionalIcon(int conditionIndex)
-		{
-			if (conditionIndex < 0) return _defaultIcon;
-			return _conditionalIcons[Mathf.Clamp(conditionIndex, 0, _conditionalIcons.Count - 1)];
-		}
 	}
 }

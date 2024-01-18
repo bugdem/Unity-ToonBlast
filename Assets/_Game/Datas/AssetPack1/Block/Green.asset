@@ -13,6 +13,17 @@ MonoBehaviour:
   m_Name: Green
   m_EditorClassIdentifier: 
   _title: Green
+  _assets:
+  - Prefab: {fileID: 8364158889781376066, guid: 331a1b491d725f343bbe114548ba40bc,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 86cd7d8e773b9b74cba1ccee621cad37, type: 3}
+  - Prefab: {fileID: 6626896614838974208, guid: 4215ca71f2c5d464bb55d9e85ebfa830,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 67f5aa8e5a7dd8b428e1affe4d9e4c22, type: 3}
+  - Prefab: {fileID: 4537577096827331668, guid: 60f8ae75f58d278428eb1819c401dc75,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 28dbbcf42d0277040b83aa40a6136342, type: 3}
+  - Prefab: {fileID: 9160135984693683073, guid: 284ce80df0f9794468e422c5122b8c1e,
+      type: 3}
+    Icon: {fileID: 21300000, guid: 734fd10b50a18aa49b021d17a8d65700, type: 3}
   _color: 2
-  _defaultIcon: {fileID: 21300000, guid: 86cd7d8e773b9b74cba1ccee621cad37, type: 3}
-  _conditionalIcons: []

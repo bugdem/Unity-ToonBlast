@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEditor;
 using System;
 using GameEngine.Util;
+using System.Linq;
 
 namespace GameEngine.Core
 {
@@ -19,16 +20,19 @@ namespace GameEngine.Core
 		private static TileData _selectedBrush;
 		private static HashSet<Vector2Int> _brushedTiles = new();
 		private static bool _isMouseDown = false;
+		private static Dictionary<CubeColor, bool> _cubeAvailableColors;
 
 		private int _row = 10;
 		private int _col = 10;
 		private List<TileColumn> _tiles;
 		private bool _levelDataExists;
 		private LevelData _loadedLevelData;
+		
 
 		public static void OpenWindow(TileManager tileManager)
 		{
 			_tileManager = tileManager;
+			_cubeAvailableColors = new();
 			string[] guids = AssetDatabase.FindAssets("t:LevelAssetPack", null);
 			if (guids.Length > 0) _assetPack = AssetDatabase.LoadAssetAtPath<LevelAssetPack>(AssetDatabase.GUIDToAssetPath(guids[0]));
 
@@ -49,12 +53,12 @@ namespace GameEngine.Core
 
 		private void OnDestroy()
 		{
+			_tileManager.TileContainer.gameObject.RemoveAllChild(true);
+
 			// When the window is destroyed, remove the delegate
 			// so that it will no longer do any drawing.
 			SceneView.duringSceneGui -= this.OnSceneGUI;
 		}
-
-		int indexovic = 0;
 
 		private void OnGUI()
 		{
@@ -113,6 +117,26 @@ namespace GameEngine.Core
 					GUILayout.Space(10f);
 
 					GUILayout.BeginHorizontal();
+					GUILayout.Label("Available Colors: ");
+					GUILayout.BeginVertical();
+					var values = Enum.GetValues(typeof(CubeColor)).Cast<CubeColor>();
+					foreach (var value in values)
+					{
+						if (value != CubeColor.Random)
+						{
+							GUILayout.BeginHorizontal();
+							var isSelected = EditorGUILayout.Toggle(value.ToString(), _cubeAvailableColors.GetValueOrDefault(value, false));
+							if (_cubeAvailableColors.ContainsKey(value)) _cubeAvailableColors[value] = isSelected;
+							else _cubeAvailableColors.Add(value, isSelected);
+							GUILayout.EndHorizontal();
+						}
+					}
+					GUILayout.EndVertical();
+					GUILayout.EndHorizontal();
+
+					GUILayout.Space(10f);
+
+					GUILayout.BeginHorizontal();
 					GUILayout.Label("Block Brush");
 					GUILayout.EndHorizontal();
 
@@ -128,13 +152,14 @@ namespace GameEngine.Core
 							var cubeData = blockAsset as CubeBlockData;
 
 							// Draw default icon.
-							if (GUI.Button(grid.GetRect(), cubeData.GetDefaultIcon().texture))
+							if (GUI.Button(grid.GetRect(), cubeData.GetAsset(0).Icon.texture))
 							{
 								_selectedBrush = new TileData
 								{
+									AssetTitle = blockAsset.Title,
 									BlockType = blockAsset.Type,
 									CubeColor = cubeData.Color,
-									Iteration = 0
+									AssetIndex = 0
 								};
 							}
 						}
@@ -143,15 +168,16 @@ namespace GameEngine.Core
 							var layeredData = blockAsset as LayeredBlockData;
 
 							// Draw default icon.
-							for (int layeredIterationIndex = 0; layeredIterationIndex < layeredData.IterationCount; layeredIterationIndex++)
+							for (int layeredIterationIndex = 0; layeredIterationIndex < layeredData.AssetCount; layeredIterationIndex++)
 							{
-								var sprite = layeredData.GetLayeredIcon(layeredIterationIndex);
+								var sprite = layeredData.GetAsset((ushort)(layeredIterationIndex)).Icon;
 								if (GUI.Button(grid.GetRect(), sprite.texture))
 								{
 									_selectedBrush = new TileData
 									{
+										AssetTitle = blockAsset.Title,
 										BlockType = blockAsset.Type,
-										Iteration = layeredIterationIndex
+										AssetIndex = layeredIterationIndex
 									};
 								}
 							}
@@ -247,6 +273,13 @@ namespace GameEngine.Core
 			_col = levelData.Col;
 			_assetPack = levelData.AssetPack;
 
+			_cubeAvailableColors.Clear();
+			var values = Enum.GetValues(typeof(CubeColor)).Cast<CubeColor>();
+			foreach (var value in values)
+			{
+				_cubeAvailableColors.Add(value, levelData.AvailableColors.Contains(value));
+			}
+
 			CreateNewLevelData();
 		}
 
@@ -260,29 +293,29 @@ namespace GameEngine.Core
 				_tiles.Add(new TileColumn { Rows = new List<TileData>(_row) });
 				for (int row = 0; row < _row; row++)
 				{
-					var tileData = _loadedLevelData == null ? new TileData { BlockType = BlockType.Cube, Iteration = 0, CubeColor = CubeColor.Random }
-															: new TileData { BlockType = _loadedLevelData.Tiles[column].Rows[row].BlockType, CubeColor = _loadedLevelData.Tiles[column].Rows[row].CubeColor, Iteration = _loadedLevelData.Tiles[column].Rows[row].Iteration };
+					var tileData = _loadedLevelData == null ? new TileData { BlockType = BlockType.Cube, AssetIndex = 0, CubeColor = CubeColor.Random }
+															: new TileData { BlockType = _loadedLevelData.Tiles[column].Rows[row].BlockType, CubeColor = _loadedLevelData.Tiles[column].Rows[row].CubeColor, AssetIndex = _loadedLevelData.Tiles[column].Rows[row].AssetIndex, AssetTitle = _loadedLevelData.Tiles[column].Rows[row].AssetTitle };
 					_tiles[column].Rows.Add(tileData);
 
 					CreateBlockEditor(tileData, row, column);
 				}
 			}
 
-			_tileManager.TileContainer.transform.localPosition = - new Vector2(_col * TileManager.TILE_BLOCK_SIZE, -_row * TileManager.TILE_BLOCK_SIZE) * .5f;
-
 			_levelDataExists = true;
 		}
 
 		private BlockEditor CreateBlockEditor(TileData tileData, int row, int column)
 		{
-			Vector2 localPosition = new Vector2(column * TileManager.TILE_BLOCK_SIZE + TileManager.TILE_BLOCK_SIZE * .5f,
+			Vector3 localPosition = new Vector2(column * TileManager.TILE_BLOCK_SIZE + TileManager.TILE_BLOCK_SIZE * .5f,
 									 -row * TileManager.TILE_BLOCK_SIZE + TileManager.TILE_BLOCK_SIZE * .5f
 									);
+			localPosition += -new Vector3(_col * TileManager.TILE_BLOCK_SIZE, -_row * TileManager.TILE_BLOCK_SIZE, 0f) * .5f;
+			localPosition += _tileManager.TileContainer.transform.position;
 
 			var blockEditor = PrefabUtility.InstantiatePrefab(_tileManager.BlockEditorPrefab, _tileManager.TileContainer.transform) as BlockEditor;
 			blockEditor.Data = tileData;
 			blockEditor.name = $"Block-{row},{column}";
-			blockEditor.transform.localPosition = localPosition;
+			blockEditor.transform.position = localPosition;
 			blockEditor.IconRenderer.sortingOrder = -row;
 			blockEditor.transform.localScale = Vector2.one * TileManager.TILE_BLOCK_SIZE;
 			blockEditor.GridIndex = new Vector2Int(row, column);
@@ -293,12 +326,12 @@ namespace GameEngine.Core
 				{
 					if (asset is CubeBlockData cubeBlockData && cubeBlockData.Color == tileData.CubeColor)
 					{
-						blockEditor.IconRenderer.sprite = cubeBlockData.GetDefaultIcon();
+						blockEditor.IconRenderer.sprite = cubeBlockData.GetAsset(0).Icon;
 						break;
 					}
 					else if (asset is LayeredBlockData layeredBlockData)
 					{
-						blockEditor.IconRenderer.sprite = layeredBlockData.GetLayeredIcon(tileData.Iteration);
+						blockEditor.IconRenderer.sprite = layeredBlockData.GetAsset((ushort)tileData.AssetIndex).Icon;
 						break;
 					}
 				}
@@ -327,6 +360,13 @@ namespace GameEngine.Core
 			_loadedLevelData.AssetPack = _assetPack;
 			// Deep copy window variables to save as scriptable object.
 			_loadedLevelData.Tiles = CloneTileList(_tiles);
+
+			_loadedLevelData.AvailableColors = new();
+			foreach (var availableColor in _cubeAvailableColors)
+			{
+				if (availableColor.Value)
+					_loadedLevelData.AvailableColors.Add(availableColor.Key);
+			}
 		}
 
 		private List<TileColumn> CloneTileList( List<TileColumn> fromTiles)
@@ -342,7 +382,8 @@ namespace GameEngine.Core
 					{
 						BlockType = rowData.BlockType,
 						CubeColor = rowData.CubeColor,
-						Iteration = rowData.Iteration
+						AssetIndex = rowData.AssetIndex,
+						AssetTitle = rowData.AssetTitle
 					};
 					newColumn.Rows.Add(tileData);
 				}

@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Random
   m_EditorClassIdentifier: 
   _title: Random
+  _assets:
+  - Prefab: {fileID: 7852703590812005155, guid: f3dd7aa722baa6d4b958c1b35d1b3900,
+      type: 3}
+    Icon: {fileID: 21300000, guid: a270fed807fb012428f70155bc6247b7, type: 3}
   _color: 0
-  _defaultIcon: {fileID: 21300000, guid: a270fed807fb012428f70155bc6247b7, type: 3}
-  _conditionalIcons: []
