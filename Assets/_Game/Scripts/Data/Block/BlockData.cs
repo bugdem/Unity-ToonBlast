@@ -12,6 +12,14 @@ namespace GameEngine.Core
         Layered
     }
 
+    public static partial class Extensions
+    {
+        public static bool CanBeTouchedByDefault(this BlockType type)
+        {
+            return type != BlockType.Layered;
+        }
+    }
+
     [Serializable]
     public class BlockAsset
     {

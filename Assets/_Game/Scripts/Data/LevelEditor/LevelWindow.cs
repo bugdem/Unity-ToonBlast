@@ -22,7 +22,7 @@ namespace GameEngine.Core
 		private static bool _isMouseDown = false;
 		private static Dictionary<CubeColor, bool> _cubeAvailableColors;
 
-		private int _row = 10;
+		private int _row = 11;
 		private int _col = 10;
 		private List<TileColumn> _tiles;
 		private bool _levelDataExists;
@@ -125,7 +125,7 @@ namespace GameEngine.Core
 						if (value != CubeColor.Random)
 						{
 							GUILayout.BeginHorizontal();
-							var isSelected = EditorGUILayout.Toggle(value.ToString(), _cubeAvailableColors.GetValueOrDefault(value, false));
+							var isSelected = EditorGUILayout.Toggle(value.ToString(), _cubeAvailableColors.GetValueOrDefault(value, true));
 							if (_cubeAvailableColors.ContainsKey(value)) _cubeAvailableColors[value] = isSelected;
 							else _cubeAvailableColors.Add(value, isSelected);
 							GUILayout.EndHorizontal();
@@ -152,7 +152,7 @@ namespace GameEngine.Core
 							var cubeData = blockAsset as CubeBlockData;
 
 							// Draw default icon.
-							if (GUI.Button(grid.GetRect(), cubeData.GetAsset(0).Icon.texture))
+							if (GUI.Button(grid.GetRect(), cubeData.GetAsset(0).Icon.texture) || _selectedBrush == null)
 							{
 								_selectedBrush = new TileData
 								{
@@ -171,7 +171,7 @@ namespace GameEngine.Core
 							for (int layeredIterationIndex = 0; layeredIterationIndex < layeredData.AssetCount; layeredIterationIndex++)
 							{
 								var sprite = layeredData.GetAsset((ushort)(layeredIterationIndex)).Icon;
-								if (GUI.Button(grid.GetRect(), sprite.texture))
+								if (GUI.Button(grid.GetRect(), sprite.texture) || _selectedBrush == null)
 								{
 									_selectedBrush = new TileData
 									{

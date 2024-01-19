@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -9,6 +10,7 @@ namespace GameEngine.Core
 	{
 		private TouchControls _touchControls;
 		private Entity _inputEntity;
+		private Camera _camera;
 
 		protected override void OnCreate()
 		{
@@ -23,6 +25,8 @@ namespace GameEngine.Core
 			_touchControls.Player.Touch.performed += OnTouch;
 
 			_inputEntity = SystemAPI.GetSingletonEntity<InputTag>();
+
+			_camera = Camera.main;
 		}
 
 		protected override void OnUpdate()
@@ -44,6 +48,11 @@ namespace GameEngine.Core
 		{
 			if (!SystemAPI.Exists(_inputEntity)) return;
 
+			float2 screenPosition = _touchControls.Player.TouchPosition.ReadValue<Vector2>();
+			SystemAPI.SetComponent<InputTouch>(_inputEntity, new InputTouch { 
+				Value = screenPosition,
+				Ray = _camera.ScreenPointToRay(new Vector3(screenPosition.x, screenPosition.y, 0f))
+			});
 			SystemAPI.SetComponentEnabled<InputTouch>(_inputEntity, true);
 		}
 	}

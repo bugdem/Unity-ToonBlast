@@ -27,7 +27,11 @@ namespace GameEngine.Core
 		public float2 Value;
 	}
 
-	public struct InputTouch : IComponentData, IEnableableComponent { }
+	public struct InputTouch : IComponentData, IEnableableComponent 
+	{
+		public float2 Value;
+		public Ray Ray;
+	}
 
 	public struct InputTag : IComponentData { }
 }
