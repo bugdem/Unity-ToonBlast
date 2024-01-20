@@ -21,7 +21,7 @@ namespace GameEngine.Core
 
         public static bool CanBeDamaged(this BlockType type)
         {
-            return type == BlockType.Cube;
+            return type == BlockType.Layered;
         }
 
         public static bool IsMovable (this BlockType type)

@@ -172,6 +172,14 @@ namespace GameEngine.Core
 			return Entity.Null;
 		}
 
+		public static bool HasBlockAssetPrefab(LevelTile tile)
+		{
+			if (tile.BlockType == BlockType.Cube) return _levelAssetPackConfigHash.CubeAssets.ContainsKey(new LevelAssetCubeBlockKey { AssetIndex = tile.AssetIndex, Color = tile.CubeColor });
+			else if (tile.BlockType == BlockType.Layered) return _levelAssetPackConfigHash.LayeredAssets.ContainsKey(new LevelAssetLayeredBlockKey { AssetIndex = tile.AssetIndex, Title = tile.AssetTitle });
+
+			return false;
+		}
+
 		public static int2 GetGridIndexFromRay(Ray ray)
 		{
 			new Plane(_levelConfig.GridForward, _levelConfig.GridCenter).Raycast(ray, out float enter);

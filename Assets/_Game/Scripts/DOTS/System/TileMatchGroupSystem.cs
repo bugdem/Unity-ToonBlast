@@ -19,6 +19,11 @@ namespace GameEngine.Core
 		private static bool _hasUpdatedTilesThisFrame;
 		private static NativeHashMap<int2, Entity> _tiles;
 
+		private NativeList<int2> _frontierTmp;
+		private NativeList<int2> _reachedTmp;
+		private NativeList<int2> _neighboursTmp;
+		private NativeList<EntityTile> _foundTilesTmp;
+
 		[BurstCompile]
 		public void OnCreate(ref SystemState state)
 		{
@@ -35,6 +40,11 @@ namespace GameEngine.Core
 			};
 
 			_tiles = new NativeHashMap<int2, Entity>(1, Allocator.Persistent);
+
+			_frontierTmp = new NativeList<int2>(Allocator.Persistent);
+			_reachedTmp = new NativeList<int2>(Allocator.Persistent);
+			_neighboursTmp = new NativeList<int2>(Allocator.Persistent);
+			_foundTilesTmp = new NativeList<EntityTile>(Allocator.Persistent);
 		}
 
 		[BurstCompile]
@@ -99,6 +109,10 @@ namespace GameEngine.Core
 			_matchAllGroup = default;
 
 			_tiles.Dispose();
+			_frontierTmp.Dispose();
+			_reachedTmp.Dispose();
+			_neighboursTmp.Dispose();
+			_foundTilesTmp.Dispose();
 		}
 
 		private void DisposeChildNatives()
@@ -116,12 +130,6 @@ namespace GameEngine.Core
 			// Dispose and clear data.
 			DisposeChildNatives();
 
-			var gridSize = LevelInitializeSystem.GridSize;
-			var frontier = new NativeList<int2>(Allocator.Temp);
-			var reached = new NativeList<int2>(Allocator.Temp);
-			var neighbours = new NativeList<int2>(Allocator.Temp);
-			var foundTiles = new NativeList<EntityTile>(Allocator.Temp);
-
 			int matchGroupIndex = 0;
 
 			var tilesToReplace = new NativeList<TileReplace>(Allocator.Temp);
@@ -134,21 +142,21 @@ namespace GameEngine.Core
 			{
 				if (levelTile.ValueRO.BlockType == BlockType.Cube && !_matchAllGroup.GroupIds.ContainsKey(levelTile.ValueRO.GridIndex))
 				{
-					FindMatch(ref state, levelTile.ValueRO, tileEntity, ref frontier, ref reached, ref neighbours, ref foundTiles);
+					FindMatch(ref state, levelTile.ValueRO, tileEntity, ref _frontierTmp, ref _reachedTmp, ref _neighboursTmp, ref _foundTilesTmp);
 
-					if (foundTiles.Length >= LevelInitializeSystem.CubeGroupConditions[0])
+					if (_foundTilesTmp.Length >= LevelInitializeSystem.CubeGroupConditions[0])
 					{
 						// We have match group.
 						var matchGroup = new MatchGroup
 						{
-							Matches = new NativeList<int2>(foundTiles.Length, Allocator.Persistent)
+							Matches = new NativeList<int2>(_foundTilesTmp.Length, Allocator.Persistent)
 						};
 
 						int newAssetIndex = 0;
 						// Find new block asset index with conditional group type.
 						for (int index = LevelInitializeSystem.CubeGroupConditions.Length - 1; index >= 1; index--)
 						{
-							if (foundTiles.Length >= LevelInitializeSystem.CubeGroupConditions[index])
+							if (_foundTilesTmp.Length >= LevelInitializeSystem.CubeGroupConditions[index])
 							{
 								// Asset to replace is found.
 								newAssetIndex = index;
@@ -156,7 +164,7 @@ namespace GameEngine.Core
 							}
 						}
 
-						foreach (var tileInMatchGroup in foundTiles)
+						foreach (var tileInMatchGroup in _foundTilesTmp)
 						{
 							matchGroup.Matches.Add(tileInMatchGroup.TileData.GridIndex);
 							_matchAllGroup.GroupIds.Add(tileInMatchGroup.TileData.GridIndex, matchGroupIndex);
@@ -198,16 +206,7 @@ namespace GameEngine.Core
 			foreach (var tileToReplace in tilesToReplace)
 			{
 				// Replace entity with new asset and copy components.
-				var canBeTouched = SystemAPI.IsComponentEnabled<CanBeTouched>(tileToReplace.EntityToDestroy);
-				var isMoving = SystemAPI.IsComponentEnabled<IsMoving>(tileToReplace.EntityToDestroy);
-				var moveTarget = SystemAPI.GetComponent<IsMoving>(tileToReplace.EntityToDestroy).Target;
-
-				ecb.DestroyEntity(tileToReplace.EntityToDestroy);
-
-				var newEntity = LevelInitializeSystem.CreateTileEntity(tileToReplace.NewTileData, ref ecb);
-				ecb.SetComponentEnabled<CanBeTouched>(newEntity, canBeTouched);
-				ecb.SetComponentEnabled<IsMoving>(newEntity, isMoving);
-				ecb.SetComponent<IsMoving>(newEntity, new IsMoving { Target = moveTarget });
+				ReplaceGridTile(ref state, tileToReplace, ref ecb);
 			}
 			ecb.Playback(state.EntityManager);
 		}
@@ -222,6 +221,9 @@ namespace GameEngine.Core
 			// Key: Column, Value: Lowest row
 			var blastXY = new NativeHashMap<int, int>(1, Allocator.Temp);
 
+			// To prevent multiple generation of same damagable tiles, cache replaced ones.
+			var replacedDamagableTiles = new NativeHashSet<int2>(1, Allocator.Temp);
+
 			// Destroy match group and find lowest rows on modified columns.
 			var ecb = new EntityCommandBuffer(Allocator.Temp);
 			for (int index = tiles.Length - 1; index >= 0; index--)
@@ -234,8 +236,50 @@ namespace GameEngine.Core
 				if (tileIndex.x > lowestRow)
 					blastXY.SafeAdd(tileIndex.y, tileIndex.x);
 
-				ecb.DestroyEntity(GetGridTile(ref state, tileIndex));
-				RemoveGridTile(ref state, tileIndex);
+				// Look for neighbour damagable tiles around blasting group.
+				FindDamagable(ref state, tileIndex, ref _neighboursTmp, ref _foundTilesTmp);
+				for (int damagableIndex = _foundTilesTmp.Length - 1;  damagableIndex >= 0; damagableIndex--)
+				{
+					var damagable = _foundTilesTmp[damagableIndex];
+					damagable.TileData.AssetIndex++;
+					// If there is next damaged asset layer, replace it.
+					if (LevelInitializeSystem.HasBlockAssetPrefab(damagable.TileData) && !replacedDamagableTiles.Contains(damagable.TileData.GridIndex))
+					{
+						ReplaceGridTile(ref state, new TileReplace
+						{
+							EntityToDestroy = damagable.Entity,
+							NewTileData = damagable.TileData
+						}, ref ecb);
+
+						replacedDamagableTiles.Add(damagable.TileData.GridIndex);
+					}
+					// This was last layer for damagable, remove from grid.
+					else
+					{
+						lowestRow = -1;
+						if (blastXY.TryGetValue(damagable.TileData.GridIndex.y, out int damagablePreviousLowestRow))
+							lowestRow = damagablePreviousLowestRow;
+
+						if (damagable.TileData.GridIndex.x > lowestRow)
+							lowestRow = damagable.TileData.GridIndex.x;
+
+						// There is a case: when a damagable is destroyed and there are already empty cells below it
+						// , above tiles would only fall until damagable's level.
+						// So we need to check if there is any empty cells below this damagable object.
+						while (lowestRow + 1 < LevelInitializeSystem.GridSize.y)
+						{
+							if (GetGridTile(ref state, new int2(lowestRow + 1, damagable.TileData.GridIndex.y)) == Entity.Null)
+								lowestRow++;
+							else break;
+						}
+						
+						blastXY.SafeAdd(damagable.TileData.GridIndex.y, lowestRow);
+
+						DestroyGridTile(ref state, damagable.TileData.GridIndex, ref ecb);
+					}
+				}
+
+				DestroyGridTile(ref state, tileIndex, ref ecb);
 			}
 			ecb.Playback(state.EntityManager);
 
@@ -309,6 +353,7 @@ namespace GameEngine.Core
 			ecbNewTile.Playback(state.EntityManager);
 		}
 
+		#region Tile Methods
 		private void UpdateGridTiles(ref SystemState state)
 		{
 			_tiles.Clear();
@@ -330,11 +375,37 @@ namespace GameEngine.Core
 			return Entity.Null;
 		}
 
-		private void RemoveGridTile(ref SystemState state, int2 gridIndex)
+		private void DestroyGridTile(ref SystemState state, int2 gridIndex)
 		{
+			var ecb = new EntityCommandBuffer(Allocator.Temp);
+			DestroyGridTile(ref state, gridIndex, ref ecb);
+		}
+
+		private void DestroyGridTile(ref SystemState state, int2 gridIndex, ref EntityCommandBuffer ecb)
+		{
+			ecb.DestroyEntity(GetGridTile(ref state, gridIndex));
+
 			_tiles.Remove(gridIndex);
 		}
 
+		private void ReplaceGridTile(ref SystemState state, TileReplace tileToReplace, ref EntityCommandBuffer ecb)
+		{
+			var canBeTouched = SystemAPI.IsComponentEnabled<CanBeTouched>(tileToReplace.EntityToDestroy);
+			var isMoving = SystemAPI.IsComponentEnabled<IsMoving>(tileToReplace.EntityToDestroy);
+			var moveTarget = SystemAPI.GetComponent<IsMoving>(tileToReplace.EntityToDestroy).Target;
+
+			// ecb.DestroyEntity(tileToReplace.EntityToDestroy);
+			ecb.DestroyEntity(GetGridTile(ref state, tileToReplace.NewTileData.GridIndex));
+			// DestroyGridTile(ref state, tileToReplace.NewTileData.GridIndex, ref ecb);
+
+			var newEntity = LevelInitializeSystem.CreateTileEntity(tileToReplace.NewTileData, ref ecb);
+			ecb.SetComponentEnabled<CanBeTouched>(newEntity, canBeTouched);
+			ecb.SetComponentEnabled<IsMoving>(newEntity, isMoving);
+			ecb.SetComponent<IsMoving>(newEntity, new IsMoving { Target = moveTarget });
+		}
+		#endregion
+
+		#region Find Tiles
 		private void FindMatch(ref SystemState state, int2 gridIndex, ref NativeList<EntityTile> foundTiles)
 		{
 			var frontier = new NativeList<int2>(Allocator.Temp);
@@ -414,12 +485,32 @@ namespace GameEngine.Core
 			}
 		}
 
-		private void FindDamagable(ref SystemState state, int2 gridIndex, ref NativeList<EntityTile> foundTiles)
+		private void FindDamagable(ref SystemState state, int2 gridIndex,
+									ref NativeList<int2> neighbours, ref NativeList<EntityTile> foundTiles)
 		{
+			neighbours.Clear();
 			foundTiles.Clear();
 
-			// LevelInitializeSystem.GetNeighbours(current, ref neighbours);
+			LevelInitializeSystem.GetNeighbours(gridIndex, ref neighbours);
+			foreach (var nextNeighbour in neighbours)
+			{
+				var neighbourEntity = GetGridTile(ref state, nextNeighbour);
+				if (neighbourEntity != Entity.Null)
+				{
+					var neighbourTileData = SystemAPI.GetComponent<LevelTile>(neighbourEntity);
+					if (neighbourTileData.BlockType.CanBeDamaged())
+					{
+						var entityTile = new EntityTile
+						{
+							TileData = neighbourTileData,
+							Entity = neighbourEntity
+						};
+						foundTiles.Add(entityTile);
+					}
+				}
+			}
 		}
+		#endregion
 	}
 
 	public struct TileReplace
