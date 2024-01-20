@@ -22,7 +22,7 @@ namespace GameEngine.Core
 			var commandBuffer = new EntityCommandBuffer(Allocator.Temp);
 
 			var spawnerEntity = commandBuffer.CreateEntity();
-			commandBuffer.SetName(spawnerEntity, "LevelConfig");
+			commandBuffer.SetName(spawnerEntity, "_LevelConfig");
 			commandBuffer.AddComponent<LevelConfig>(spawnerEntity);
 			commandBuffer.SetComponent<LevelConfig>(spawnerEntity, new LevelConfig
 			{
@@ -118,7 +118,23 @@ namespace GameEngine.Core
 		public BlockType BlockType;
 		public CubeColor CubeColor;
 		public int AssetIndex;
+
+		public LevelTile Clone()
+		{
+			return new LevelTile
+			{
+				AssetIndex = AssetIndex,
+				GridIndex = GridIndex,
+				BlockType = BlockType,
+				CubeColor = CubeColor,
+				AssetTitle = AssetTitle
+			};
+		}
 	}
 
 	public struct CanBeTouched : IComponentData, IEnableableComponent { }
+	public struct IsMoving : IComponentData, IEnableableComponent 
+	{
+		public int2 Target;
+	}
 }

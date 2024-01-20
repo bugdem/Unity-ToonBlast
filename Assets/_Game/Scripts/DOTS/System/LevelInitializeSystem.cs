@@ -14,16 +14,18 @@ using Random = Unity.Mathematics.Random;
 namespace GameEngine.Core
 {
 	public struct LevelInitializeEvent : IComponentData { }
+	public struct UpdateMatchEvent : IComponentData, IEnableableComponent { }
 
+	[UpdateBefore(typeof(TileMoveSystem))]
 	public partial struct LevelInitializeSystem : ISystem
 	{
 		// Immutable, set only once on start of this system.
 		private static LevelConfig _levelConfig;
 		private static LevelAssetPackConfigHash _levelAssetPackConfigHash;
 		private static NativeArray<CubeColor> _availableCubeColors;
-
-		// Mutable, may change later by other system logics.
-		private static NativeHashMap<int2, Entity> _gridEntities;
+		public static readonly FixedList32Bytes<int> CubeGroupConditions = new FixedList32Bytes<int> { 2, 3, 5, 7 };
+		public static int2 GridSize => _levelConfig.GridSize;		
+		private static Random _random;
 
 		[BurstCompile]
 		public void OnCreate(ref SystemState state)
@@ -71,10 +73,9 @@ namespace GameEngine.Core
 			for (int index = 0; index < availableColors.Length; index++)
 				_availableCubeColors[index] = availableColors[index].CubeColor;
 
-			var random = new Random((uint)DateTime.Now.Millisecond);
-			var ecb = new EntityCommandBuffer(Allocator.Temp);
+			_random = new Random((uint)DateTime.Now.Millisecond);
 
-			_gridEntities = new NativeHashMap<int2, Entity>(_levelConfig.GridSize.x * _levelConfig.GridSize.y, Allocator.Persistent);
+			var ecb = new EntityCommandBuffer(Allocator.Temp);
 
 			// Create cube entities with level data.
 			for (int column = 0; column < _levelConfig.GridSize.x; column++)
@@ -82,10 +83,6 @@ namespace GameEngine.Core
 				for (int row = 0; row < _levelConfig.GridSize.y; row++)
 				{
 					var tileData = levelTiles[column * _levelConfig.GridSize.y + row];
-
-					// Replace random cubes with cubes from available colors.
-					if (tileData.BlockType == BlockType.Cube && tileData.CubeColor == CubeColor.Random)
-						tileData.CubeColor = _availableCubeColors[random.NextInt(0, _availableCubeColors.Length)];
 
 					var entityTileData = new LevelTile
 					{
@@ -95,19 +92,8 @@ namespace GameEngine.Core
 						GridIndex = tileData.GridIndex,
 						AssetIndex = tileData.AssetIndex
 					};
-					var entityLocalTransform = new LocalTransform
-					{
-						Position = GetTileWorldPosition(tileData.GridIndex, _levelConfig.GridSize.y, _levelConfig.GridSize.x) + _levelConfig.GridCenter,
-						Scale = TileSize,
-						Rotation = quaternion.identity
-					};
 
-					var tileEntity = ecb.Instantiate(GetBlockAssetPrefab(entityTileData));
-					ecb.SetName(tileEntity, $"Tile ({tileData.GridIndex.x},{tileData.GridIndex.y})");
-					ecb.AddComponent<LevelTile>(tileEntity, entityTileData);
-					ecb.SetComponent<LocalTransform>(tileEntity, entityLocalTransform);
-					ecb.AddComponent<CanBeTouched>(tileEntity);
-					ecb.SetComponentEnabled<CanBeTouched>(tileEntity, entityTileData.BlockType.CanBeTouchedByDefault());
+					CreateTileEntity(entityTileData, ref ecb);
 
 					// Cannot add before Entity Command Buffer is not played back.
 					// _gridEntities.Add(entityTileData.GridIndex, tileEntity);
@@ -115,16 +101,41 @@ namespace GameEngine.Core
 			}
 
 			var initCompletedEntity = ecb.CreateEntity();
+			ecb.SetName(initCompletedEntity, "_LevelInitialize");
 			ecb.AddComponent<LevelInitializeEvent>(initCompletedEntity);
+			ecb.AddComponent<UpdateMatchEvent>(initCompletedEntity);
+			ecb.SetComponentEnabled<UpdateMatchEvent>(initCompletedEntity, true);
 
 			ecb.Playback(state.EntityManager);
+		}
 
-			// Cache entities with grid index.
-			foreach (var (tileData, entity) in
-						SystemAPI.Query<RefRO<LevelTile>>().WithEntityAccess())
+		public static Entity CreateTileEntity(LevelTile entityTileData, ref EntityCommandBuffer ecb)
+		{
+			// Replace random cubes with cubes from available colors.
+			if (entityTileData.BlockType == BlockType.Cube && entityTileData.CubeColor == CubeColor.Random)
+				entityTileData.CubeColor = _availableCubeColors[_random.NextInt(0, _availableCubeColors.Length)];
+
+			var entityLocalTransform = new LocalTransform
 			{
-				_gridEntities.Add(tileData.ValueRO.GridIndex, entity);
-			}
+				Position = GetTileWorldPosition(entityTileData.GridIndex),
+				Scale = TileSize,
+				Rotation = quaternion.identity
+			};
+
+			var tileEntity = ecb.Instantiate(GetBlockAssetPrefab(entityTileData));
+			ecb.SetName(tileEntity, $"Tile ({entityTileData.GridIndex.x},{entityTileData.GridIndex.y})");
+			ecb.AddComponent<LevelTile>(tileEntity, entityTileData);
+			ecb.SetComponent<LocalTransform>(tileEntity, entityLocalTransform);
+			ecb.AddComponent<CanBeTouched>(tileEntity);
+			ecb.SetComponentEnabled<CanBeTouched>(tileEntity, entityTileData.BlockType.CanBeTouchedByDefault());
+			ecb.AddComponent<IsMoving>(tileEntity);
+			ecb.SetComponentEnabled<IsMoving>(tileEntity, false);
+			return tileEntity;
+		}
+
+		public static float3 GetTileWorldPosition(int2 gridIndex)
+		{
+			return GetTileWorldPosition(gridIndex, GridSize.y, GridSize.x);
 		}
 
 		public static float3 GetTileWorldPosition(int2 gridIndex, int rowCount, int columnCount)
@@ -133,6 +144,7 @@ namespace GameEngine.Core
 						 -gridIndex.x * TileSize + TileSize * .5f
 						);
 			Vector3 worldPosition = localPosition - new Vector3(columnCount * TileSize, -rowCount * TileSize, 0f) * .5f;
+			worldPosition += new Vector3(_levelConfig.GridCenter.x, _levelConfig.GridCenter.y, _levelConfig.GridCenter.z);
 			worldPosition += Vector3.forward * gridIndex.x * 0.01f;
 			return worldPosition;
 		}
@@ -160,15 +172,13 @@ namespace GameEngine.Core
 			return Entity.Null;
 		}
 
-		public static Entity GetEntityFromRay(Ray ray)
+		public static int2 GetGridIndexFromRay(Ray ray)
 		{
 			new Plane(_levelConfig.GridForward, _levelConfig.GridCenter).Raycast(ray, out float enter);
 			float3 rayWorldPosition = ray.GetPoint(enter);
 			int2 gridIndex = GetTileGridIndexFromWorldPosition(rayWorldPosition);
 
-			_gridEntities.TryGetValue(gridIndex, out Entity entity);
-
-			return entity;
+			return gridIndex;
 		}
 
 		// Returns indexes by checking borders. It does not check if they are available for matching or other things.
@@ -182,31 +192,17 @@ namespace GameEngine.Core
 			if ((gridIndex + GEMath.grid2n.up).x >= 0) neighbours.Add(gridIndex + GEMath.grid2n.up);
 		}
 
-		public static Entity GetEntity(int2 gridIndex)
-		{
-			if (_gridEntities.TryGetValue(gridIndex, out Entity entity)) 
-				return entity;
-
-			return Entity.Null;
-		}
-
-		public static int2 GridSize => _levelConfig.GridSize;
-
-		public static void RemoveEntityFromCache(int2 gridIndex)
-		{
-			if (_gridEntities.ContainsKey(gridIndex))
-				_gridEntities.Remove(gridIndex);
-		}
+		public static int FallPointGridOffsetY => -3;
 	}
 
 	public struct EntityTile : IEquatable<EntityTile>
 	{
-		public int2 GridIndex;
+		public LevelTile TileData;
 		public Entity Entity;
 
 		public bool Equals(EntityTile other)
 		{
-			return GridIndex.Equals(other.GridIndex);
+			return TileData.GridIndex.Equals(other.TileData.GridIndex);
 		}
 	}
 }

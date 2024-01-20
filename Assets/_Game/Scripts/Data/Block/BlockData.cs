@@ -18,6 +18,16 @@ namespace GameEngine.Core
         {
             return type != BlockType.Layered;
         }
+
+        public static bool CanBeDamaged(this BlockType type)
+        {
+            return type == BlockType.Cube;
+        }
+
+        public static bool IsMovable (this BlockType type)
+        {
+            return type != BlockType.Layered;
+        }
     }
 
     [Serializable]
