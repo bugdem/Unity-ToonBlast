@@ -169,9 +169,11 @@ namespace GameEngine.Core
 			UpdateGridTiles(ref state);
 
 			var random = new Random((uint)System.DateTime.Now.GetHashCode());
-			var cubeTiles = _cubeTilesForShuffle.ToNativeArray(Allocator.Temp);
+			// Memcopy hash to array to modify. We can only swap cube blocks.
+			var cubeTiles = new NativeList<int2>(_cubeTilesForShuffle.Count, Allocator.Temp);
+			cubeTiles.CopyFrom(_cubeTilesForShuffle.ToNativeArray(Allocator.Temp));
 			// Shuffle cube tile array in place.
-			for (int index = cubeTiles.Length - 1; index >= 0; index --)
+			for (int index = cubeTiles.Length - 1; index >= 0; index--)
 			{
 				int randomArrayIndex = random.NextInt(0, index);
 				var swapValue = cubeTiles[index];
@@ -181,7 +183,83 @@ namespace GameEngine.Core
 				SwapTiles(ref state, cubeTiles[randomArrayIndex], cubeTiles[index]);
 			}
 
-			// Register an update for next frame.
+			// Get guaranteed match count from settings.
+			int matchToGenerate = LevelInitializeSystem.MatchSpawnCountForShuffle[LevelInitializeSystem.MatchSpawnCountForShuffle.Length - 1].SpawnCount;
+			int gridTileCount = LevelInitializeSystem.GridSize.x * LevelInitializeSystem.GridSize.y;
+			for (int index = 0; index < LevelInitializeSystem.MatchSpawnCountForShuffle.Length; index ++)
+			{
+				var setting = LevelInitializeSystem.MatchSpawnCountForShuffle[index];
+				if (gridTileCount <= setting.GridTileCount)
+				{
+					matchToGenerate = setting.SpawnCount;
+					break;
+				}
+			}
+
+			_neighboursTmp.Clear();
+
+			var lowestMatchRequirement = LevelInitializeSystem.CubeGroupConditions[0];
+			var ecb = new EntityCommandBuffer(Allocator.Temp);
+			// Spawn guaranteed matches.
+			for (int index = 0; index < matchToGenerate; index ++)
+			{
+				bool matchCreated = false;
+				byte matchCount = (byte)(lowestMatchRequirement - 1);
+
+				// Randomly select a tile from cube list.
+				// There may be a slight chance that selected cube to be surrounded by none blocks, like box.
+				// This while loop ensures that we create a match with possible cube blocks.
+				while (!matchCreated && cubeTiles.Length > 0)
+				{					
+					// var randomGrid = _cubeTilesForShuffle.ElementAt(random.NextInt(0, _cubeTilesForShuffle.Count));
+					var randomIndex = random.NextInt(0, cubeTiles.Length);
+					var randomGrid = cubeTiles[randomIndex];
+					var currentEntity = GetGridTile(ref state, randomGrid);
+					var currentEntityData = SystemAPI.GetComponent<LevelTile>(currentEntity);
+
+					cubeTiles.RemoveAt(randomIndex);
+
+					LevelInitializeSystem.GetNeighbours(randomGrid, ref _neighboursTmp);
+					foreach (var nextNeighbour in _neighboursTmp)
+					{
+						// Remove checked tiles.
+						// WARNING(GE): Normally, we should use hashset (_cubeTilesForShuffle) to check or remove for performance.
+						// But at current state of NativeContainers like NativeHashSet, almost none of enumerator functions are implemented(Like ElementAt()).
+						// So change this in future.
+						cubeTiles.RemoveAt(cubeTiles.IndexOf(nextNeighbour));
+
+						var neighbourEntity = GetGridTile(ref state, nextNeighbour);
+						var neighbourTileData = SystemAPI.GetComponent<LevelTile>(neighbourEntity);
+
+						// This neigbour can be changed to same the color with started cube color.
+						// If they have already same color, we do not need to create a new tile.
+						if (currentEntityData.CubeColor != neighbourTileData.CubeColor)
+						{
+							DestroyGridTile(ref state, nextNeighbour, ref ecb);
+							var newTileData = new LevelTile
+							{
+								AssetIndex = 0,
+								BlockType = BlockType.Cube,
+								CubeColor = currentEntityData.CubeColor,
+								GridIndex = nextNeighbour
+							};
+							var newEntity = LevelInitializeSystem.CreateTileEntity(newTileData, ref ecb);
+						}
+
+						matchCount = (byte)(matchCount - 1);
+						if (matchCount <= 0)
+						{
+							Debug.Log($"Match group created: {randomGrid}, CubeColor: {currentEntityData.CubeColor}");
+							matchCreated = true;
+							break;
+						}
+					}
+				}
+
+			}
+			ecb.Playback(state.EntityManager);
+
+			// Register an update for next frame to reduce load on current frame.
 			foreach (var updateMatchGroup in SystemAPI.Query<EnabledRefRW<UpdateMatchEvent>>().WithDisabled<UpdateMatchEvent>())
 			{
 				updateMatchGroup.ValueRW = true;

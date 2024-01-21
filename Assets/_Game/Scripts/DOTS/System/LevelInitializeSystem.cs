@@ -23,9 +23,24 @@ namespace GameEngine.Core
 		private static LevelConfig _levelConfig;
 		private static LevelAssetPackConfigHash _levelAssetPackConfigHash;
 		private static NativeArray<CubeColor> _availableCubeColors;
-		public static readonly FixedList32Bytes<int> CubeGroupConditions = new FixedList32Bytes<int> { 2, 3, 5, 7 };
+
+		// These values defines match group rules. Lowest tile count to consider it as a match is first index of this list.
+		public static readonly FixedList32Bytes<byte> CubeGroupConditions = new FixedList32Bytes<byte> { 2, 3, 5, 7 };
+		public static readonly FixedList32Bytes<MatchCount> MatchSpawnCountForShuffle = new FixedList32Bytes<MatchCount> { 
+																							new MatchCount { GridTileCount = 10, SpawnCount = 1 },
+																							new MatchCount { GridTileCount = 20, SpawnCount = 2 },
+																							new MatchCount { GridTileCount = 50, SpawnCount = 3 },
+																							new MatchCount { GridTileCount = 70, SpawnCount = 4 },
+																							new MatchCount { GridTileCount = 100, SpawnCount = 5 },
+																						};
 		public static int2 GridSize => _levelConfig.GridSize;		
 		private static Random _random;
+
+		public struct MatchCount
+		{
+			public ushort GridTileCount;
+			public byte SpawnCount;
+		}
 
 		[BurstCompile]
 		public void OnCreate(ref SystemState state)
