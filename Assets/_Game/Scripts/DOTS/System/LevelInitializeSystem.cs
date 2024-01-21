@@ -73,7 +73,7 @@ namespace GameEngine.Core
 			for (int index = 0; index < availableColors.Length; index++)
 				_availableCubeColors[index] = availableColors[index].CubeColor;
 
-			_random = new Random((uint)DateTime.Now.Millisecond);
+			_random = new Random((uint)System.DateTime.Now.GetHashCode());
 
 			var ecb = new EntityCommandBuffer(Allocator.Temp);
 

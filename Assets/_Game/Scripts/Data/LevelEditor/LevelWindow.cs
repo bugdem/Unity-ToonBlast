@@ -117,7 +117,7 @@ namespace GameEngine.Core
 					GUILayout.Space(10f);
 
 					GUILayout.BeginHorizontal();
-					GUILayout.Label("Available Colors: ");
+					GUILayout.Label("Available Colors (K): ");
 					GUILayout.BeginVertical();
 					var values = Enum.GetValues(typeof(CubeColor)).Cast<CubeColor>();
 					foreach (var value in values)
@@ -151,6 +151,7 @@ namespace GameEngine.Core
 						{
 							var cubeData = blockAsset as CubeBlockData;
 
+							GUI.enabled = !_cubeAvailableColors.ContainsKey(cubeData.Color) || _cubeAvailableColors[cubeData.Color];
 							// Draw default icon.
 							if (GUI.Button(grid.GetRect(), cubeData.GetAsset(0).Icon.texture) || _selectedBrush == null)
 							{
@@ -162,6 +163,7 @@ namespace GameEngine.Core
 									AssetIndex = 0
 								};
 							}
+							GUI.enabled = true;
 						}
 						else if (blockAsset.Type == BlockType.Layered)
 						{
@@ -399,6 +401,7 @@ namespace GameEngine.Core
 		private readonly int _width;
 		private Rect _currentRow;
 		private int _lastX = 0;
+		public int _lastY = 0;
 
 		public GridEditor(int width, int height)
 		{
@@ -412,6 +415,7 @@ namespace GameEngine.Core
 			{
 				_currentRow = GUILayoutUtility.GetRect(_width, _height);
 				_lastX = 0;
+				_lastY += _height;
 			}
 
 			return GetNextRectInCurrentRow();
@@ -419,6 +423,13 @@ namespace GameEngine.Core
 
 		private bool EnoughSpaceInCurrentRow()
 		{
+			/*
+			if (Event.current.type == EventType.Repaint)
+			{
+				_currentRow = GUILayoutUtility.GetLastRect();
+			}
+			*/
+
 			return _currentRow.width >= _lastX + _width;
 		}
 

@@ -7,6 +7,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
+using Random = Unity.Mathematics.Random;
 
 namespace GameEngine.Core
 {
@@ -14,11 +15,14 @@ namespace GameEngine.Core
 	[UpdateAfter(typeof(TileMoveSystem))]
 	public partial struct TileMatchGroupSystem : ISystem, ISystemStartStop
 	{
-		private static MatchAllGroup _matchAllGroup;
-
 		private static bool _hasUpdatedTilesThisFrame;
+		private static MatchAllGroup _matchAllGroup;
 		private static NativeHashMap<int2, Entity> _tiles;
 
+		private static NativeHashSet<int2> _cubeTilesForShuffle;
+		private static bool _shuffleNextFrame;
+
+		// Temporary cache for finding match gropus.
 		private NativeList<int2> _frontierTmp;
 		private NativeList<int2> _reachedTmp;
 		private NativeList<int2> _neighboursTmp;
@@ -40,6 +44,7 @@ namespace GameEngine.Core
 			};
 
 			_tiles = new NativeHashMap<int2, Entity>(1, Allocator.Persistent);
+			_cubeTilesForShuffle = new NativeHashSet<int2>(1, Allocator.Persistent);
 
 			_frontierTmp = new NativeList<int2>(Allocator.Persistent);
 			_reachedTmp = new NativeList<int2>(Allocator.Persistent);
@@ -58,6 +63,13 @@ namespace GameEngine.Core
 		{
 			_hasUpdatedTilesThisFrame = false;
 
+			if (_shuffleNextFrame)
+			{
+				Shuffle(ref state);
+				return;
+			}
+
+			// Get players input touch and blast if touched on any match group.
 			Entity touchedEntity = Entity.Null;
 
 			foreach (var touchInput in SystemAPI.Query<RefRO<InputTouch>>())
@@ -70,34 +82,42 @@ namespace GameEngine.Core
 			bool needsUpdateMatchGroups = false;
 			if (touchedEntity != Entity.Null && SystemAPI.IsComponentEnabled<CanBeTouched>(touchedEntity))
 			{
+				// Get touched entity info.
 				var tileData = SystemAPI.GetComponent<LevelTile>(touchedEntity);
-				Debug.Log("Touched Entity!: " + tileData.GridIndex);
+				Debug.Log($"Touched Entity: {tileData.GridIndex}, Color: {tileData.CubeColor}");
 
 				if (tileData.BlockType == BlockType.Cube)
 				{
+					// If there is any match group with touch tile, blast it.
 					if (_matchAllGroup.GroupIds.TryGetValue(tileData.GridIndex, out int matchGroupIndex))
 					{
 						var matchGroup = _matchAllGroup.Groups[matchGroupIndex];
+						int matchCount = matchGroup.Matches.Length;
 						BlastTiles(ref state, ref matchGroup.Matches);
 
 						needsUpdateMatchGroups = true;
+
+						GEDebug.LogColored($"Blast({matchCount})! Condition: {tileData.AssetIndex}, Color: {tileData.CubeColor}", tileData.CubeColor.GetColor());
 					}
 				}
 			}
+			//
 
+			// Check if there is any match group update event triggered by other systems.
 			foreach (var (updateMatchGroup, entity) in
 				SystemAPI.Query<EnabledRefRW<UpdateMatchEvent>>().WithEntityAccess())
 			{
 				updateMatchGroup.ValueRW = false;
 				needsUpdateMatchGroups = true;
-
-				// Cannot call UpdateAllMatches here as it causes structural changes while iterating in SystemAPI.Query
+				// Cannot call UpdateAllMatches here as it causes structural changes and throws exception while iterating in SystemAPI.Query.
 			}
 
 			if (needsUpdateMatchGroups)
 			{
-				UpdateAllMatches(ref state);
+				UpdateMatchGroups(ref state);
+				ShuffleIfNeeded(ref state);				
 			}
+			//
 		}
 
 		private void DisposeAll()
@@ -125,18 +145,58 @@ namespace GameEngine.Core
 			}
 		}
 
-		private void UpdateAllMatches(ref SystemState state)
+		private void ShuffleIfNeeded(ref SystemState state)
 		{
-			// Dispose and clear data.
+			// Check if there is any match on grid.
+			if (_matchAllGroup.Groups.Length <= 0)
+			{
+				// No match found, check if there are tiles still moving.
+				EntityQueryBuilder queryBuilder = new EntityQueryBuilder(Allocator.Temp)
+					.WithAll<LevelTile, IsMoving>();
+				EntityQuery entityQuery = state.EntityManager.CreateEntityQuery(queryBuilder);
+				if (entityQuery.CalculateEntityCount() <= 0)
+				{
+					_shuffleNextFrame = true;
+					Debug.Log("Shuffling!");
+				}
+			}
+		}
+
+		private void Shuffle(ref SystemState state)
+		{
+			_shuffleNextFrame = false;
+
+			UpdateGridTiles(ref state);
+
+			var random = new Random((uint)System.DateTime.Now.GetHashCode());
+			var cubeTiles = _cubeTilesForShuffle.ToNativeArray(Allocator.Temp);
+			// Shuffle cube tile array in place.
+			for (int index = cubeTiles.Length - 1; index >= 0; index --)
+			{
+				int randomArrayIndex = random.NextInt(0, index);
+				var swapValue = cubeTiles[index];
+				cubeTiles[index] = cubeTiles[randomArrayIndex];
+				cubeTiles[randomArrayIndex] = swapValue;
+
+				SwapTiles(ref state, cubeTiles[randomArrayIndex], cubeTiles[index]);
+			}
+
+			// Register an update for next frame.
+			foreach (var updateMatchGroup in SystemAPI.Query<EnabledRefRW<UpdateMatchEvent>>().WithDisabled<UpdateMatchEvent>())
+			{
+				updateMatchGroup.ValueRW = true;
+			}
+		}
+
+		private void UpdateMatchGroups(ref SystemState state)
+		{
+			// Dispose and clear temporary cache.
 			DisposeChildNatives();
 
 			int matchGroupIndex = 0;
-
 			var tilesToReplace = new NativeList<TileReplace>(Allocator.Temp);
 
-			// var ecb = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(World.DefaultGameObjectInjectionWorld.Unmanaged);
-			// var ecb = new EntityCommandBuffer(state.WorldUpdateAllocator);
-
+			// Iterate over each touchable tiles to find match groups and create replace tile list with new assets (Conditional icons) if needed.
 			foreach (var (levelTile, canBeTouched, tileEntity) in
 						SystemAPI.Query<RefRO<LevelTile>, EnabledRefRO<CanBeTouched>>().WithAll<CanBeTouched>().WithEntityAccess())
 			{
@@ -144,6 +204,7 @@ namespace GameEngine.Core
 				{
 					FindMatch(ref state, levelTile.ValueRO, tileEntity, ref _frontierTmp, ref _reachedTmp, ref _neighboursTmp, ref _foundTilesTmp);
 
+					// Check if found tile count satisfies minimum match group condition.
 					if (_foundTilesTmp.Length >= LevelInitializeSystem.CubeGroupConditions[0])
 					{
 						// We have match group.
@@ -164,6 +225,8 @@ namespace GameEngine.Core
 							}
 						}
 
+						// If tiles in match group needs different kind of assets, add them to the list to change them when iteration is over.
+						// Ex: Match group with 7 Tiles has different icon from group with 2 tiles.
 						foreach (var tileInMatchGroup in _foundTilesTmp)
 						{
 							matchGroup.Matches.Add(tileInMatchGroup.TileData.GridIndex);
@@ -186,7 +249,8 @@ namespace GameEngine.Core
 						_matchAllGroup.Groups.Add(matchGroup);
 						matchGroupIndex++;
 					}
-					// There is no match, revert asset to standart one.
+
+					// There is no match, revert asset to standart one if needed.
 					else if (levelTile.ValueRO.AssetIndex != 0)
 					{
 						var newTileData = levelTile.ValueRO.Clone();
@@ -202,6 +266,8 @@ namespace GameEngine.Core
 			}
 
 			// var ecb = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(World.DefaultGameObjectInjectionWorld.Unmanaged);
+			// var ecb = new EntityCommandBuffer(state.WorldUpdateAllocator);
+
 			var ecb = new EntityCommandBuffer(Allocator.Temp);
 			foreach (var tileToReplace in tilesToReplace)
 			{
@@ -211,14 +277,14 @@ namespace GameEngine.Core
 			ecb.Playback(state.EntityManager);
 		}
 
-		// 1. Destroy match group
-		// 2. Find lowest row on modified columns
-		// 3. Find upper tiles to move down
-		// 4. Generate new tiles
+		// 1. Destroy tiles in match group.
+		// 2. Find lowest row on modified columns.
+		// 3. Find upper tiles to move down.
+		// 4. Generate new tiles that will fall down.
 		private void BlastTiles(ref SystemState state, ref NativeList<int2> tiles)
 		{
-			// Holds bottom row index for each column
-			// Key: Column, Value: Lowest row
+			// Holds bottom row index for each column.
+			// Key: Column, Value: Lowest row.
 			var blastXY = new NativeHashMap<int, int>(1, Allocator.Temp);
 
 			// To prevent multiple generation of same damagable tiles, cache replaced ones.
@@ -236,13 +302,14 @@ namespace GameEngine.Core
 				if (tileIndex.x > lowestRow)
 					blastXY.SafeAdd(tileIndex.y, tileIndex.x);
 
-				// Look for neighbour damagable tiles around blasting group.
+				// Look for neighbouring damagable tiles around blasting group.
 				FindDamagable(ref state, tileIndex, ref _neighboursTmp, ref _foundTilesTmp);
 				for (int damagableIndex = _foundTilesTmp.Length - 1;  damagableIndex >= 0; damagableIndex--)
 				{
 					var damagable = _foundTilesTmp[damagableIndex];
 					damagable.TileData.AssetIndex++;
-					// If there is next damaged asset layer, replace it.
+
+					// If there is next damaged asset layer, replace it (Ex: Icon Box2 -> Box1) .
 					if (LevelInitializeSystem.HasBlockAssetPrefab(damagable.TileData) && !replacedDamagableTiles.Contains(damagable.TileData.GridIndex))
 					{
 						ReplaceGridTile(ref state, new TileReplace
@@ -252,8 +319,10 @@ namespace GameEngine.Core
 						}, ref ecb);
 
 						replacedDamagableTiles.Add(damagable.TileData.GridIndex);
+
+						Debug.Log($"{damagable.TileData.AssetTitle} damaged: {damagable.TileData.GridIndex}");
 					}
-					// This was last layer for damagable, remove from grid.
+					// This was last layer for damagable, remove it from grid.
 					else
 					{
 						lowestRow = -1;
@@ -266,6 +335,7 @@ namespace GameEngine.Core
 						// There is a case: when a damagable is destroyed and there are already empty cells below it
 						// , above tiles would only fall until damagable's level.
 						// So we need to check if there is any empty cells below this damagable object.
+						// IF there is, change lowest row on column.
 						while (lowestRow + 1 < LevelInitializeSystem.GridSize.y)
 						{
 							if (GetGridTile(ref state, new int2(lowestRow + 1, damagable.TileData.GridIndex.y)) == Entity.Null)
@@ -275,10 +345,14 @@ namespace GameEngine.Core
 						
 						blastXY.SafeAdd(damagable.TileData.GridIndex.y, lowestRow);
 
+						Debug.Log($"{damagable.TileData.AssetTitle} destroyed: {damagable.TileData.GridIndex}");
+
+						// Destroy damagable tile found around match group.
 						DestroyGridTile(ref state, damagable.TileData.GridIndex, ref ecb);
 					}
 				}
 
+				// Destroy match group tile.
 				DestroyGridTile(ref state, tileIndex, ref ecb);
 			}
 			ecb.Playback(state.EntityManager);
@@ -288,9 +362,9 @@ namespace GameEngine.Core
 			// Move upwards from lowest row on column.
 			foreach (var blastKVPair in blastXY)
 			{
+				int column = blastKVPair.Key;
 				int newTileCountToGenerate = 0;
 				int lastRowToMove = blastKVPair.Value;
-				int column = blastKVPair.Key;
 				int bottomMostRow = blastKVPair.Value;
 
 				for (int row = bottomMostRow; row >= 0; row --)
@@ -303,12 +377,12 @@ namespace GameEngine.Core
 					}
 
 					var tileData = SystemAPI.GetComponent<LevelTile>(tileAtRow);
-					// Current tile may already in target position, so check it.
+					// Current tile may already in target position, if so, no need to move it.
 					if (tileData.BlockType.IsMovable() && !(tileData.GridIndex.x == column && tileData.GridIndex.y == lastRowToMove))
 					{
 						tileData.GridIndex = new int2(lastRowToMove, column);
 
-						// Mark this tile as moving to make it movable by TileMoveSystem.
+						// Mark this tile as movable to make it moved by TileMoveSystem.
 						SystemAPI.SetComponentEnabled<IsMoving>(tileAtRow, true);
 						SystemAPI.SetComponent<IsMoving>(tileAtRow, new IsMoving { Target = tileData.GridIndex });
 						SystemAPI.SetComponentEnabled<CanBeTouched>(tileAtRow, false);
@@ -318,11 +392,13 @@ namespace GameEngine.Core
 					}
 					else
 					{
+						// There may be unmovable block like Box or there is no need to move the tile.
 						newTileCountToGenerate = 0;
 						lastRowToMove = row - 1;
 					}
 				}
 
+				// Create new tiles for this column if needed.
 				if (newTileCountToGenerate > 0)
 				{
 					for (int index = newTileCountToGenerate - 1; index >= 0; index --)
@@ -357,11 +433,14 @@ namespace GameEngine.Core
 		private void UpdateGridTiles(ref SystemState state)
 		{
 			_tiles.Clear();
+			_cubeTilesForShuffle.Clear();
 			// Cache entities with grid index.
 			foreach (var (tileData, entity) in
 						SystemAPI.Query<RefRO<LevelTile>>().WithEntityAccess())
 			{
 				_tiles.Add(tileData.ValueRO.GridIndex, entity);
+				if (tileData.ValueRO.BlockType == BlockType.Cube)
+					_cubeTilesForShuffle.Add(tileData.ValueRO.GridIndex);
 			}
 		}
 
@@ -386,6 +465,7 @@ namespace GameEngine.Core
 			ecb.DestroyEntity(GetGridTile(ref state, gridIndex));
 
 			_tiles.Remove(gridIndex);
+			_cubeTilesForShuffle.Remove(gridIndex);
 		}
 
 		private void ReplaceGridTile(ref SystemState state, TileReplace tileToReplace, ref EntityCommandBuffer ecb)
@@ -402,6 +482,28 @@ namespace GameEngine.Core
 			ecb.SetComponentEnabled<CanBeTouched>(newEntity, canBeTouched);
 			ecb.SetComponentEnabled<IsMoving>(newEntity, isMoving);
 			ecb.SetComponent<IsMoving>(newEntity, new IsMoving { Target = moveTarget });
+		}
+
+		private void SwapTiles(ref SystemState state, int2 tile1, int2 tile2)
+		{
+			var tileEntity1 = GetGridTile(ref state, tile1);
+			var tileEntity2 = GetGridTile(ref state, tile2);
+			var tileEntityLT1 = SystemAPI.GetComponent<LocalTransform>(tileEntity1);
+			var tileEntityLT2 = SystemAPI.GetComponent<LocalTransform>(tileEntity2);
+			var tileEntityData1 = SystemAPI.GetComponent<LevelTile>(tileEntity1);
+			var tileEntityData2 = SystemAPI.GetComponent<LevelTile>(tileEntity2);
+
+			SystemAPI.SetComponent<LocalTransform>(tileEntity1, tileEntityLT2);
+			SystemAPI.SetComponent<LocalTransform>(tileEntity2, tileEntityLT1);
+
+			tileEntityData1.GridIndex = tile2;
+			tileEntityData2.GridIndex = tile1;
+			
+			SystemAPI.SetComponent<LevelTile>(tileEntity1, tileEntityData1);			
+			SystemAPI.SetComponent<LevelTile>(tileEntity2, tileEntityData2);
+
+			_tiles[tile1] = tileEntity2;
+			_tiles[tile2] = tileEntity1;
 		}
 		#endregion
 
@@ -434,6 +536,17 @@ namespace GameEngine.Core
 			FindMatch(ref state, startEntityTileData, startEntity, ref frontier, ref reached, ref neighbours, ref foundTiles);
 		}
 
+		/// <summary>
+		/// Finds matches for tile using Breadth First Search algorithm.
+		/// BFS is useful to provide wave like explosions as it searches by increasing radius.
+		/// </summary>
+		/// <param name="state"></param>
+		/// <param name="startEntityTileData"></param>
+		/// <param name="startEntity"></param>
+		/// <param name="frontier"></param>
+		/// <param name="reached"></param>
+		/// <param name="neighbours"></param>
+		/// <param name="foundTiles"></param>
 		private void FindMatch(ref SystemState state, LevelTile startEntityTileData, Entity startEntity
 								, ref NativeList<int2> frontier, ref NativeList<int2> reached
 								, ref NativeList<int2> neighbours, ref NativeList<EntityTile> foundTiles)

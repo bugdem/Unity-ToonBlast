@@ -7,7 +7,7 @@ namespace GameEngine.Core
 {
 	[UpdateInGroup(typeof(SimulationSystemGroup), OrderLast = true)]
 	[UpdateAfter(typeof(EndSimulationEntityCommandBufferSystem))]
-	public partial struct ResetInputSystem : ISystem
+	public partial struct InputResetSystem : ISystem
 	{
 		[BurstCompile]
 		public void OnUpdate(ref SystemState state)

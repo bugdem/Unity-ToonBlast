@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace GameEngine.Core
 {
+	// Bakes assets like cube or box blocks that will be used to create tiles by systems.
 	public class AssetBridgeAuthoring : MonoBehaviour
 	{
 		[SerializeField] private List<LevelAssetPack> _assetPacks;
@@ -18,6 +19,11 @@ namespace GameEngine.Core
 		{
 			public override void Bake(AssetBridgeAuthoring authoring)
 			{
+				// Bake assets that will be used in game.
+				// WARNING(GE): Because of baking limitations, we cannot bake only the current level's assets as baking function
+				// should know everything in build time, not runtime.
+				// For now, it is not a problem because we have one asset pack. But in future, for memory reasons
+				// , this may needs to be changed in future.
 				var playerEntity = GetEntity(TransformUsageFlags.None);
 				foreach (var assetPack in authoring.AssetPacks)
 				{
@@ -53,41 +59,6 @@ namespace GameEngine.Core
 							}
 						}
 					}
-
-					/*
-					LevelAssetPackConfig config = new LevelAssetPackConfig();
-					
-					NativeHashMap<LevelAssetCubeBlockKey, Entity> cubeAssets = new(50, Allocator.Persistent);
-					NativeHashMap<LevelAssetLayeredBlockKey, Entity> layeredAssets = new(50, Allocator.Persistent);
-
-					foreach (var blockData in assetPack.BlockAssets)
-					{
-						if (blockData is CubeBlockData cubeBlockData)
-						{
-							for (int index = 0; index < cubeBlockData.AssetCount; index++)
-							{
-								cubeAssets.Add(new LevelAssetCubeBlockKey { AssetIndex = index, Color = cubeBlockData.Color }
-												, GetEntity(cubeBlockData.GetAsset((ushort)index).Prefab, TransformUsageFlags.Dynamic)
-											);
-							}
-						}
-						else if (blockData is LayeredBlockData layeredBlockData)
-						{
-							for (int index = 0; index < layeredBlockData.AssetCount; index++)
-							{
-								layeredAssets.Add(new LevelAssetLayeredBlockKey { AssetIndex = index, Title = layeredBlockData.Title }
-												, GetEntity(layeredBlockData.GetAsset((ushort)index).Prefab, TransformUsageFlags.Dynamic)
-											);
-							}
-						}
-					}
-
-					config.Id = assetPack.Id;
-					config.CubeAssets = cubeAssets;
-					config.LayeredAssets = layeredAssets;
-					*/
-
-
 				}
 			}
 		}
@@ -138,35 +109,4 @@ namespace GameEngine.Core
 		[ReadOnly] public NativeHashMap<LevelAssetCubeBlockKey, Entity> CubeAssets;
 		[ReadOnly] public NativeHashMap<LevelAssetLayeredBlockKey, Entity> LayeredAssets;
 	}
-
-	/*
-	public struct LevelAssetPackConfig : IComponentData
-	{
-		[ReadOnly] public int Id;
-		[ReadOnly] public NativeHashMap<int, Entity> CubeAssets;
-		[ReadOnly] public NativeHashMap<int, Entity> LayeredAssets;
-	}
-
-	public struct LevelAssetCubeBlockKey : IEquatable<LevelAssetCubeBlockKey>
-	{
-		public CubeColor Color;
-		public int AssetIndex;
-
-		public bool Equals(LevelAssetCubeBlockKey other)
-		{
-			return Color == other.Color && AssetIndex == other.AssetIndex;
-		}
-	}
-
-	public struct LevelAssetLayeredBlockKey : IEquatable<LevelAssetLayeredBlockKey>
-	{
-		public FixedString64Bytes Title;
-		public int AssetIndex;
-
-		public bool Equals(LevelAssetLayeredBlockKey other)
-		{
-			return Title.Equals(other.Title) && AssetIndex == other.AssetIndex;
-		}
-	}
-	*/
 }

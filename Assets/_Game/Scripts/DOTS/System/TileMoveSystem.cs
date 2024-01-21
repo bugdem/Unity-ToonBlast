@@ -34,7 +34,6 @@ namespace GameEngine.Core
 				var isMoving = SystemAPI.GetComponent<IsMoving>(entity);
 				float3 targetPosition = LevelInitializeSystem.GetTileWorldPosition(isMoving.Target);
 				localTransform.ValueRW.Position = Vector3.MoveTowards(localTransform.ValueRO.Position, targetPosition, SystemAPI.Time.DeltaTime * 2f); ;
-
 				
 				if (math.distancesq(localTransform.ValueRO.Position, targetPosition) < 0.001f)
 				{
