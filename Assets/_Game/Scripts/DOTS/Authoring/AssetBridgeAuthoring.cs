@@ -90,6 +90,11 @@ namespace GameEngine.Core
 		{
 			return Color == other.Color && AssetIndex == other.AssetIndex;
 		}
+
+		public override int GetHashCode()
+		{
+			return ((FixedString64Bytes)($"{Color}&{AssetIndex}")).GetHashCode();
+		}
 	}
 
 	public struct LevelAssetLayeredBlockKey : IEquatable<LevelAssetLayeredBlockKey>
@@ -100,6 +105,11 @@ namespace GameEngine.Core
 		public bool Equals(LevelAssetLayeredBlockKey other)
 		{
 			return Title.Equals(other.Title) && AssetIndex == other.AssetIndex;
+		}
+
+		public override int GetHashCode()
+		{
+			return ((FixedString64Bytes)($"{Title}&{AssetIndex}")).GetHashCode();
 		}
 	}
 

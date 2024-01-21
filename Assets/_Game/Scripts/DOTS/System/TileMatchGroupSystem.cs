@@ -15,12 +15,12 @@ namespace GameEngine.Core
 	[UpdateAfter(typeof(TileMoveSystem))]
 	public partial struct TileMatchGroupSystem : ISystem, ISystemStartStop
 	{
-		private static bool _hasUpdatedTilesThisFrame;
-		private static MatchAllGroup _matchAllGroup;
-		private static NativeHashMap<int2, Entity> _tiles;
+		private bool _hasUpdatedTilesThisFrame;
+		private MatchAllGroup _matchAllGroup;
+		private NativeHashMap<int2, Entity> _tiles;
 
-		private static NativeHashSet<int2> _cubeTilesForShuffle;
-		private static bool _shuffleNextFrame;
+		private NativeHashSet<int2> _cubeTilesForShuffle;
+		private bool _shuffleNextFrame;
 
 		// Temporary cache for finding match gropus.
 		private NativeList<int2> _frontierTmp;
@@ -168,7 +168,8 @@ namespace GameEngine.Core
 
 			UpdateGridTiles(ref state);
 
-			var random = new Random((uint)System.DateTime.Now.GetHashCode());
+			// var random = new Random(0x6E624EB7u);
+			var random = new Random((uint)(SystemAPI.Time.ElapsedTime*100 + 1).ClampMin(1));
 			// Memcopy hash to array to modify. We can only swap cube blocks.
 			var cubeTiles = new NativeList<int2>(_cubeTilesForShuffle.Count, Allocator.Temp);
 			cubeTiles.CopyFrom(_cubeTilesForShuffle.ToNativeArray(Allocator.Temp));

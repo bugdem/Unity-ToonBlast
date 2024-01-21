@@ -16,13 +16,41 @@ namespace GameEngine.Core
 	public struct LevelInitializeEvent : IComponentData { }
 	public struct UpdateMatchEvent : IComponentData, IEnableableComponent { }
 
+	public abstract class BurstLevelConfig
+	{
+		public static readonly SharedStatic<LevelConfig> LevelConfigField =
+			SharedStatic<LevelConfig>.GetOrCreate<BurstLevelConfig, LevelConfigFieldKey>();
+		private class LevelConfigFieldKey { }
+	}
+
+	public abstract class BurstLevelAssetPackConfigHash
+	{
+		public static readonly SharedStatic<LevelAssetPackConfigHash> Field =
+			SharedStatic<LevelAssetPackConfigHash>.GetOrCreate<BurstLevelAssetPackConfigHash, LevelAssetPackConfigHashFieldKey>();
+		private class LevelAssetPackConfigHashFieldKey { }
+	}
+
+	public abstract class BurstAvailableColors
+	{
+		public static readonly SharedStatic<NativeArray<CubeColor>> Field =
+			SharedStatic<NativeArray<CubeColor>>.GetOrCreate<BurstAvailableColors, AvailableColorsFieldKey>();
+		private class AvailableColorsFieldKey { }
+	}
+
+	public abstract class BurstRandom
+	{
+		public static readonly SharedStatic<Random> Field =
+			SharedStatic<Random>.GetOrCreate<BurstRandom, RandomFieldKey>();
+		private class RandomFieldKey { }
+	}
+
 	[UpdateBefore(typeof(TileMoveSystem))]
 	public partial struct LevelInitializeSystem : ISystem
 	{
 		// Immutable, set only once on start of this system.
-		private static LevelConfig _levelConfig;
-		private static LevelAssetPackConfigHash _levelAssetPackConfigHash;
-		private static NativeArray<CubeColor> _availableCubeColors;
+		private static LevelConfig _levelConfig { get => BurstLevelConfig.LevelConfigField.Data; set => BurstLevelConfig.LevelConfigField.Data = value; }
+		private static LevelAssetPackConfigHash _levelAssetPackConfigHash { get => BurstLevelAssetPackConfigHash.Field.Data; set => BurstLevelAssetPackConfigHash.Field.Data = value; }
+
 
 		// These values defines match group rules. Lowest tile count to consider it as a match is first index of this list.
 		public static readonly FixedList32Bytes<byte> CubeGroupConditions = new FixedList32Bytes<byte> { 2, 3, 5, 7 };
@@ -33,8 +61,7 @@ namespace GameEngine.Core
 																							new MatchCount { GridTileCount = 70, SpawnCount = 4 },
 																							new MatchCount { GridTileCount = 100, SpawnCount = 5 },
 																						};
-		public static int2 GridSize => _levelConfig.GridSize;		
-		private static Random _random;
+		public static int2 GridSize => _levelConfig.GridSize;
 
 		public struct MatchCount
 		{
@@ -84,11 +111,11 @@ namespace GameEngine.Core
 			}
 
 			// Cache available cube colors for random cubes.
-			_availableCubeColors = new NativeArray<CubeColor>(availableColors.Length, Allocator.Persistent);
+			BurstAvailableColors.Field.Data = new NativeArray<CubeColor>(availableColors.Length, Allocator.Persistent);
 			for (int index = 0; index < availableColors.Length; index++)
-				_availableCubeColors[index] = availableColors[index].CubeColor;
+				BurstAvailableColors.Field.Data[index] = availableColors[index].CubeColor;
 
-			_random = new Random((uint)System.DateTime.Now.GetHashCode());
+			BurstRandom.Field.Data = new Random((uint)(SystemAPI.Time.ElapsedTime * 100 + 1).ClampMin(1));
 
 			var ecb = new EntityCommandBuffer(Allocator.Temp);
 
@@ -128,7 +155,7 @@ namespace GameEngine.Core
 		{
 			// Replace random cubes with cubes from available colors.
 			if (entityTileData.BlockType == BlockType.Cube && entityTileData.CubeColor == CubeColor.Random)
-				entityTileData.CubeColor = _availableCubeColors[_random.NextInt(0, _availableCubeColors.Length)];
+				entityTileData.CubeColor = BurstAvailableColors.Field.Data[BurstRandom.Field.Data.NextInt(0, BurstAvailableColors.Field.Data.Length)];
 
 			var entityLocalTransform = new LocalTransform
 			{

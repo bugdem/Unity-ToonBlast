@@ -27,13 +27,13 @@ namespace GameEngine.Core
 			commandBuffer.SetName(spawnerEntity, "_LevelConfig");
 			commandBuffer.AddComponent<LevelConfig>(spawnerEntity);
 			commandBuffer.SetComponent<LevelConfig>(spawnerEntity, new LevelConfig
-			{
-				AssetPackId = CurrentLevelData.AssetPack.Id,
-				LevelIndex = LevelManager.Instance.CurrentLevelIndex,
-				GridCenter = TileManager.Instance.TileContainer.transform.position,
-				GridSize = new int2(CurrentLevelData.Col, CurrentLevelData.Row),
-				GridForward = TileManager.Instance.TileContainer.transform.forward
-			});
+			(
+				LevelManager.Instance.CurrentLevelIndex,
+				CurrentLevelData.AssetPack.Id,				
+				TileManager.Instance.TileContainer.transform.position,
+				TileManager.Instance.TileContainer.transform.forward,
+				new int2(CurrentLevelData.Col, CurrentLevelData.Row)
+			));
 			var gridTiles = commandBuffer.AddBuffer<LevelTileData>(spawnerEntity);
 			for (int y = 0; y < CurrentLevelData.Col; y++)
 			{
@@ -63,11 +63,20 @@ namespace GameEngine.Core
 
 	public struct LevelConfig: IComponentData
 	{
-		public int LevelIndex;
-		public int AssetPackId;
-		public float3 GridCenter;
-		public float3 GridForward;
-		public int2 GridSize;
+		readonly public int LevelIndex;
+		readonly public int AssetPackId;
+		readonly public float3 GridCenter;
+		readonly public float3 GridForward;
+		readonly public int2 GridSize;
+
+		public LevelConfig(int levelIndex, int assetPackId, float3 gridCenter, float3 gridForward, int2 gridSize)
+		{
+			LevelIndex = levelIndex;
+			AssetPackId = assetPackId;
+			GridCenter = gridCenter;
+			GridForward = gridForward;
+			GridSize = gridSize;
+		}
 	}
 
 	public struct LevelTileData : IBufferElementData

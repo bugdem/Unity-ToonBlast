@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.Collections;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -680,7 +681,12 @@ namespace GameEngine.Util
 			Gizmos.DrawLine(box.frontBottomLeft, box.backBottomLeft);
 		}
 
-		public static void LogColored(string text, Color color)
+		public static void LogColored1(FixedString128Bytes text, Color color)
+		{
+			Debug.Log(string.Format("<color=#{0:X2}{1:X2}{2:X2}>{3}</color>", (byte)(color.r * 255f), (byte)(color.g * 255f), (byte)(color.b * 255f), text));
+		}
+
+		public static void LogColored(FixedString128Bytes text, Color color)
 		{
 			Debug.Log(string.Format("<color=#{0:X2}{1:X2}{2:X2}>{3}</color>", (byte)(color.r * 255f), (byte)(color.g * 255f), (byte)(color.b * 255f), text));
 		}

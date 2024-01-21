@@ -14,7 +14,7 @@ namespace GameEngine.Core
 
 			var tileManager = target as TileManager;
 
-			if (GUILayout.Button("Editor Window"))
+			if (GUILayout.Button("Level Editor"))
 			{
 				LevelWindow.OpenWindow(tileManager);
 			}
