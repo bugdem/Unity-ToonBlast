@@ -169,7 +169,7 @@ namespace GameEngine.Core
 			UpdateGridTiles(ref state);
 
 			// var random = new Random(0x6E624EB7u);
-			var random = new Random((uint)(SystemAPI.Time.ElapsedTime*100 + 1).ClampMin(1));
+			var random = new Random((uint)(BursDateTimeNow.Field.Data + 1).ClampMin(1));
 			// Memcopy hash to array to modify. We can only swap cube blocks.
 			var cubeTiles = new NativeList<int2>(_cubeTilesForShuffle.Count, Allocator.Temp);
 			cubeTiles.CopyFrom(_cubeTilesForShuffle.ToNativeArray(Allocator.Temp));

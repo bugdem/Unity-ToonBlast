@@ -44,6 +44,13 @@ namespace GameEngine.Core
 		private class RandomFieldKey { }
 	}
 
+	public abstract class BursDateTimeNow
+	{
+		public static readonly SharedStatic<int> Field =
+			SharedStatic<int>.GetOrCreate<BursDateTimeNow, DateTimeNowFieldKey>();
+		private class DateTimeNowFieldKey { }
+	}
+
 	[UpdateBefore(typeof(TileMoveSystem))]
 	public partial struct LevelInitializeSystem : ISystem
 	{
@@ -115,7 +122,7 @@ namespace GameEngine.Core
 			for (int index = 0; index < availableColors.Length; index++)
 				BurstAvailableColors.Field.Data[index] = availableColors[index].CubeColor;
 
-			BurstRandom.Field.Data = new Random((uint)(SystemAPI.Time.ElapsedTime * 100 + 1).ClampMin(1));
+			BurstRandom.Field.Data = new Random((uint)(BursDateTimeNow.Field.Data).ClampMin(1));
 
 			var ecb = new EntityCommandBuffer(Allocator.Temp);
 

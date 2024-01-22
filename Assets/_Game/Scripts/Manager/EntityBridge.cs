@@ -1,4 +1,5 @@
 using GameEngine.Util;
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
@@ -18,6 +19,8 @@ namespace GameEngine.Core
             if (IsLevelDataPrepared) return;
 
             IsLevelDataPrepared = true;
+
+			BursDateTimeNow.Field.Data = DateTime.Now.Millisecond;
 
 			var entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
 			var commandBuffer = new EntityCommandBuffer(Allocator.Temp);
@@ -58,6 +61,11 @@ namespace GameEngine.Core
 
 			commandBuffer.Playback(entityManager);
 			commandBuffer.Dispose();
+		}
+
+		private void Update()
+		{
+			BursDateTimeNow.Field.Data = DateTime.Now.Millisecond;
 		}
 	}
 

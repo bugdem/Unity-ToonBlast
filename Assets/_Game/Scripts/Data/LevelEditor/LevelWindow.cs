@@ -15,28 +15,30 @@ namespace GameEngine.Core
 	{
 		private const string LEVELDATA_FILE_PATH = "Assets/_Game/Datas/Levels";
 		
-		private static TileManager _tileManager;
-		private static LevelAssetPack _assetPack;
-		private static TileData _selectedBrush;
-		private static HashSet<Vector2Int> _brushedTiles = new();
-		private static bool _isMouseDown = false;
-		private static Dictionary<CubeColor, bool> _cubeAvailableColors;
+		public TileManager _tileManager;
+		public LevelAssetPack _assetPack;
+		public Dictionary<CubeColor, bool> _cubeAvailableColors;
 
-		private int _row = 11;
+		private TileData _selectedBrush;
+		private HashSet<Vector2Int> _brushedTiles = new();
+		private bool _isMouseDown = false;
+
+		private int _row = 8;
 		private int _col = 10;
 		private List<TileColumn> _tiles;
 		private bool _levelDataExists;
-		private LevelData _loadedLevelData;
-		
+		private LevelData _loadedLevelData;		
 
 		public static void OpenWindow(TileManager tileManager)
 		{
-			_tileManager = tileManager;
-			_cubeAvailableColors = new();
-			string[] guids = AssetDatabase.FindAssets("t:LevelAssetPack", null);
-			if (guids.Length > 0) _assetPack = AssetDatabase.LoadAssetAtPath<LevelAssetPack>(AssetDatabase.GUIDToAssetPath(guids[0]));
-
 			var window = GetWindow<LevelWindow>("Level Editor");
+			window._tileManager = tileManager;
+			window._cubeAvailableColors = new();
+			string[] guids = AssetDatabase.FindAssets("t:LevelAssetPack", null);
+			if (guids.Length > 0) window._assetPack = AssetDatabase.LoadAssetAtPath<LevelAssetPack>(AssetDatabase.GUIDToAssetPath(guids[0]));
+
+			window.minSize = new Vector2(350f, 500f);
+			window.maxSize = new Vector2(400f, 550f);
 			window.Show();
 		}
 
@@ -83,7 +85,7 @@ namespace GameEngine.Core
 			GUILayout.Space(20f);
 
 			GUILayout.BeginHorizontal();
-			if (GUILayout.Button("Create New Level"))
+			if (GUILayout.Button("Create New Level", GUILayout.Width(200f), GUILayout.Height(50f)))
 			{
 				Debug.Log("New Level Creating...");
 
@@ -91,6 +93,19 @@ namespace GameEngine.Core
 				CreateNewLevelData();
 
 				Debug.Log("Level Created!");
+			}
+
+			if (_levelDataExists)
+			{
+				GUILayout.Space(20f);
+
+				var guiColor = GUI.backgroundColor;
+				GUI.backgroundColor = Color.green;
+				if (GUILayout.Button("Save Level", GUILayout.Width(100), GUILayout.Height(50f)))
+				{
+					SaveLevel();
+				}
+				GUI.backgroundColor = guiColor;
 			}
 			GUILayout.EndHorizontal();
 
@@ -194,14 +209,6 @@ namespace GameEngine.Core
 
 					GUILayout.EndHorizontal();
 				}
-
-				GUILayout.Space(20f);
-				GUILayout.BeginHorizontal();
-				if (GUILayout.Button("Save Level", GUILayout.Width(100)))
-				{
-					SaveLevel();
-				}
-				GUILayout.EndHorizontal();
 			}
 		}
 
@@ -349,11 +356,11 @@ namespace GameEngine.Core
 			{
 				string fileName = $"{System.Guid.NewGuid().ToString()}";
 
-				var newLevelData = ScriptableObject.CreateInstance<LevelData>();
-				newLevelData.name = fileName;
-				AssetDatabase.CreateAsset(newLevelData, $"{LEVELDATA_FILE_PATH}/{fileName}.asset");
+				_loadedLevelData = ScriptableObject.CreateInstance<LevelData>();
+				_loadedLevelData.name = fileName;
+				AssetDatabase.CreateAsset(_loadedLevelData, $"{LEVELDATA_FILE_PATH}/{fileName}.asset");
 
-				_loadedLevelData =  newLevelData as LevelData;
+				// _loadedLevelData =  newLevelData as LevelData;
 			}
 
 			// Update current level data
@@ -369,6 +376,11 @@ namespace GameEngine.Core
 				if (availableColor.Value)
 					_loadedLevelData.AvailableColors.Add(availableColor.Key);
 			}
+
+			AssetDatabase.SaveAssets();
+			EditorUtility.FocusProjectWindow();
+
+			EditorUtility.SetDirty(_loadedLevelData);
 		}
 
 		private List<TileColumn> CloneTileList( List<TileColumn> fromTiles)

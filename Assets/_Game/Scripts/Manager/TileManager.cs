@@ -17,10 +17,5 @@ namespace GameEngine.Core
         public Transform BorderBackground => _borderBackground;
         public Transform TileContainer => _tileContainer;
         public const float TILE_BLOCK_SIZE = .4f;
-
-        public void LoadLevel(LevelData levelData)
-        {
-
-        }
 	}
 }
