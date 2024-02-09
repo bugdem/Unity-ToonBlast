@@ -9,3 +9,5 @@ A Toon Blast DOTS implementation uses Unity ECS. Project is developed by using u
 - Stationary blocks are interactable and can be blasted while other blocks are falling.
 - A basic asset pack system(Using ScritableObjects).
 - Deadlock shuffling.
+
+![](https://github.com/bugdem/Unity-ToonBlast/blob/main/Media/Movie_001.mp4)
