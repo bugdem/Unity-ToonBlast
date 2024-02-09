@@ -10,4 +10,5 @@ A Toon Blast DOTS implementation uses Unity ECS. Project is developed by using u
 - A basic asset pack system(Using ScritableObjects).
 - Deadlock shuffling.
 
-![](https://github.com/bugdem/Unity-ToonBlast/blob/main/Media/Movie_001.mp4)
+![](https://github.com/bugdem/Unity-ToonBlast/blob/main/Media/BlockBlast.gif)
+![](https://github.com/bugdem/Unity-ToonBlast/blob/main/Media/Shuffle.gif)
